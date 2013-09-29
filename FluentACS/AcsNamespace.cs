@@ -136,7 +136,7 @@
         {
             try
             {
-                managementWrapper.GetTokenFromACS();
+               managementWrapper.GetTokenFromACS();
             }
             catch (Exception ex)
             {

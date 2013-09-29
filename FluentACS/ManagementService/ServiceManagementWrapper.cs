@@ -22,6 +22,7 @@ namespace FluentACS.ManagementService
         private readonly string serviceIdentityUsernameForManagement;
         private readonly string serviceNamespace;
         private static string cachedSwtToken;
+        private static DateTime swtTokenExpiresOn;
 
         public ServiceManagementWrapper(string serviceNamespace, string serviceIdentityUsernameForManagement, string serviceIdentityPasswordForManagement)
         {
@@ -1038,9 +1039,11 @@ namespace FluentACS.ManagementService
 
         private void AttachTokenWithWritePermissions(HttpWebRequest args)
         {
-            if (cachedSwtToken == null)
+            if (cachedSwtToken == null || swtTokenExpiresOn <= DateTime.UtcNow)
             {
-                cachedSwtToken = GetTokenFromACS();
+                var token = GetTokenFromACS();
+                cachedSwtToken = token.AccessToken;
+                swtTokenExpiresOn = DateTime.UtcNow.AddSeconds(token.ExpiresIn);
             }
 
             args.Headers.Add(HttpRequestHeader.Authorization, "Bearer " + cachedSwtToken);
@@ -1060,7 +1063,7 @@ namespace FluentACS.ManagementService
         /// Obtains a SWT token from ACSv2. 
         /// </summary>
         /// <returns>A token  from ACS.</returns>
-        public string GetTokenFromACS()
+        public OAuth2TokenResponse GetTokenFromACS()
         {
             //
             // Request a token from ACS
@@ -1081,8 +1084,8 @@ namespace FluentACS.ManagementService
             //
             using (MemoryStream responseStream = new MemoryStream(responseBytes))
             {
-                OAuth2TokenResponse tokenResponse = (OAuth2TokenResponse)new DataContractJsonSerializer(typeof(OAuth2TokenResponse)).ReadObject(responseStream);
-                return tokenResponse.AccessToken;
+                return (OAuth2TokenResponse)new DataContractJsonSerializer(typeof(OAuth2TokenResponse)).ReadObject(responseStream);
+               
             }
         }
 
@@ -1126,10 +1129,13 @@ namespace FluentACS.ManagementService
         }
 
         [DataContract]
-        private class OAuth2TokenResponse
+        public class OAuth2TokenResponse
         {
             [DataMember(Name = "access_token")]
             public string AccessToken { get; set; }
+
+            [DataMember(Name = "expires_in")]
+            public int ExpiresIn { get; set; }
         }
     }
 }
